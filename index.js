@@ -1,25 +1,33 @@
 'use strict';
 
+// =======================
+// RENDER WEB SERVER
+// =======================
+const express = require('express');
+const app = express();
+
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('✅ Bot is running');
+});
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[Web] Server running on port ${PORT}`);
+});
+
+// =======================
+// MINECRAFT BOT
+// =======================
 const mineflayer = require('mineflayer');
-const { pathfinder, Movements } = require('mineflayer-pathfinder');
 const config = require('./settings.json');
 
 let bot = null;
-let reconnectAttempts = 0;
-let attackInterval = null;
 
-// =========================
-// RECONNECT DELAY
-// =========================
-function getDelay() {
-  const base = config.utils["base-delay"];
-  const max = config.utils["max-delay"];
-  return Math.min(base * Math.pow(2, reconnectAttempts), max);
-}
-
-// =========================
-// CREATE BOT
-// =========================
 function createBot() {
   console.log('[Bot] Starting...');
 
@@ -28,22 +36,26 @@ function createBot() {
     port: config.server.port,
     username: config["bot-account"].username,
     auth: config["bot-account"].type,
-    version: config.server.version
+    version: false
   });
 
-  bot.loadPlugin(pathfinder);
-
-  bot.once('spawn', () => {
+  bot.on('spawn', () => {
     console.log('[Bot] ✅ Connected!');
-    reconnectAttempts = 0;
 
-    const mcData = require('minecraft-data')(bot.version);
-    const defaultMove = new Movements(bot, mcData);
-    bot.pathfinder.setMovements(defaultMove);
+    // Anti-AFK (simple + stable)
+    setInterval(() => {
+      if (!bot) return;
 
-    startAntiAFK();
-    startAutoEat();
-    startDefense();
+      try {
+        bot.swingArm();
+        bot.setControlState('jump', true);
+
+        setTimeout(() => {
+          if (bot) bot.setControlState('jump', false);
+        }, 500);
+
+      } catch (e) {}
+    }, 30000);
   });
 
   bot.on('end', () => {
@@ -51,107 +63,15 @@ function createBot() {
     reconnect();
   });
 
-  bot.on('kicked', (reason) => {
-    console.log('[Bot] ⚠️ Kicked:', reason);
-  });
-
   bot.on('error', (err) => {
-    console.log('[Bot] Error:', err.message);
+    console.log('[Bot] Error:', err.code || err.message);
   });
 }
 
-// =========================
-// RECONNECT SYSTEM
-// =========================
 function reconnect() {
-  if (!config.utils["auto-reconnect"]) return;
-
-  reconnectAttempts++;
-  const delay = getDelay();
-
-  console.log(`[Bot] Reconnecting in ${delay / 1000}s...`);
-  setTimeout(createBot, delay);
+  console.log('[Bot] Reconnecting in 10s...');
+  setTimeout(createBot, 10000);
 }
 
-// =========================
-// ANTI AFK
-// =========================
-function startAntiAFK() {
-  setInterval(() => {
-    if (!bot || !bot.entity) return;
-
-    try {
-      bot.swingArm();
-
-      const yaw = Math.random() * Math.PI * 2;
-      bot.look(yaw, 0);
-
-      if (Math.random() > 0.5) {
-        bot.setControlState('jump', true);
-        setTimeout(() => bot.setControlState('jump', false), 300);
-      }
-    } catch {}
-  }, 15000);
-}
-
-// =========================
-// AUTO EAT
-// =========================
-function startAutoEat() {
-  bot.on('health', () => {
-    try {
-      if (bot.food > 14) return;
-
-      const food = bot.inventory.items().find(i => i.foodPoints > 0);
-
-      if (food) {
-        bot.equip(food, 'hand')
-          .then(() => bot.consume())
-          .catch(() => {});
-      }
-    } catch {}
-  });
-}
-
-// =========================
-// DEFENSE SYSTEM
-// =========================
-function startDefense() {
-  bot.on('entityHurt', (entity) => {
-    if (!bot.entity || entity !== bot.entity) return;
-
-    const attacker = Object.values(bot.entities).find(e => {
-      return e.type === 'player' &&
-        e.username !== bot.username &&
-        bot.entity.position.distanceTo(e.position) < 4;
-    });
-
-    if (attacker) {
-      console.log('[Defense] Attacked by', attacker.username);
-      attackTarget(attacker);
-    }
-  });
-}
-
-function attackTarget(target) {
-  if (attackInterval) clearInterval(attackInterval);
-
-  attackInterval = setInterval(() => {
-    if (!bot || !target) return;
-
-    if (!target.position || bot.entity.position.distanceTo(target.position) > 5) {
-      clearInterval(attackInterval);
-      return;
-    }
-
-    try {
-      bot.lookAt(target.position.offset(0, target.height, 0));
-      bot.attack(target);
-    } catch {}
-  }, 700);
-}
-
-// =========================
-// START WITH DELAY (IMPORTANT)
-// =========================
-setTimeout(createBot, 20000);
+// Start bot (delay for Aternos startup)
+setTimeout(createBot, 15000);
