@@ -1,0 +1,17 @@
+{
+  "name": "AFK Bot",
+  "bot-account": {
+    "username": "GhopGhop",
+    "type": "offline"
+  },
+  "server": {
+    "ip": "voidpulsegenesis.aternos.me",
+    "port": 11798,
+    "version": false
+  },
+  "utils": {
+    "auto-reconnect": true,
+    "base-delay": 5000,
+    "max-delay": 60000
+  }
+}
