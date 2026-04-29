@@ -6,12 +6,6 @@
   },
   "server": {
     "ip": "voidpulsegenesis.aternos.me",
-    "port": 11798,
-    "version": false
-  },
-  "utils": {
-    "auto-reconnect": true,
-    "base-delay": 5000,
-    "max-delay": 60000
+    "port": 11798
   }
 }
